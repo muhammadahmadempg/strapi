@@ -1,12 +1,12 @@
 {
-  "name": "strapi",
+  "name": "strapi-custom",
   "private": true,
   "bugs": {
     "url": "https://github.com/strapi/strapi/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/strapi/strapi.git"
+    "url": "git://github.com/muhammadahmadempg/strapi.git"
   },
   "license": "SEE LICENSE IN LICENSE",
   "author": {
