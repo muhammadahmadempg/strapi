@@ -1,6 +1,7 @@
 {
   "name": "strapi-custom",
   "private": true,
+  "version": "1.0",
   "bugs": {
     "url": "https://github.com/strapi/strapi/issues"
   },
