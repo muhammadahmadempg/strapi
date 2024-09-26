@@ -1,13 +1,15 @@
+import { useNotification, useFetchClient } from '@strapi/admin/strapi-admin';
+import { useIntl } from 'react-intl';
 import { useMutation, useQueryClient } from 'react-query';
-import { useNotification } from '@strapi/helper-plugin';
 
 import pluginId from '../pluginId';
-import { axiosInstance, getRequestUrl, getTrad } from '../utils';
+import { getTrad } from '../utils';
 
 export const useBulkRemove = () => {
-  const toggleNotification = useNotification();
+  const { toggleNotification } = useNotification();
+  const { formatMessage } = useIntl();
   const queryClient = useQueryClient();
-  const url = getRequestUrl('actions/bulk-delete');
+  const { post } = useFetchClient();
 
   const bulkRemoveQuery = (filesAndFolders) => {
     const payload = filesAndFolders.reduce((acc, selected) => {
@@ -23,7 +25,7 @@ export const useBulkRemove = () => {
       return acc;
     }, {});
 
-    return axiosInstance.post(url, payload);
+    return post('/upload/actions/bulk-delete', payload);
   };
 
   const mutation = useMutation(bulkRemoveQuery, {
@@ -43,14 +45,14 @@ export const useBulkRemove = () => {
 
       toggleNotification({
         type: 'success',
-        message: {
+        message: formatMessage({
           id: getTrad('modal.remove.success-label'),
           defaultMessage: 'Elements have been successfully deleted.',
-        },
+        }),
       });
     },
     onError(error) {
-      toggleNotification({ type: 'warning', message: error.message });
+      toggleNotification({ type: 'danger', message: error.message });
     },
   });
 

@@ -1,13 +1,13 @@
-import axios from 'axios';
-import { useRef, useState } from 'react';
-import { useMutation, useQueryClient } from 'react-query';
+import { useState } from 'react';
+
+import { useNotification, useFetchClient } from '@strapi/admin/strapi-admin';
 import { useIntl } from 'react-intl';
-import { useNotification } from '@strapi/helper-plugin';
+import { useMutation, useQueryClient } from 'react-query';
 
-import { axiosInstance, getTrad } from '../utils';
 import pluginId from '../pluginId';
+import { getTrad } from '../utils';
 
-const editAssetRequest = (asset, file, cancelToken, onProgress) => {
+const editAssetRequest = (asset, file, signal, onProgress, post) => {
   const endpoint = `/${pluginId}?id=${asset.id}`;
 
   const formData = new FormData();
@@ -21,31 +21,32 @@ const editAssetRequest = (asset, file, cancelToken, onProgress) => {
     JSON.stringify({
       alternativeText: asset.alternativeText,
       caption: asset.caption,
-      folder: asset.folder?.id,
+      folder: asset.folder,
       name: asset.name,
     })
   );
 
-  return axiosInstance({
-    method: 'post',
-    url: endpoint,
-    data: formData,
-    cancelToken: cancelToken.token,
-    onUploadProgress({ total, loaded }) {
-      onProgress((loaded / total) * 100);
-    },
+  /**
+   * onProgress is not possible using native fetch
+   * need to look into an alternative to make it work
+   * perhaps using xhr like Axios does
+   */
+  return post(endpoint, formData, {
+    signal,
   }).then((res) => res.data);
 };
 
 export const useEditAsset = () => {
   const [progress, setProgress] = useState(0);
   const { formatMessage } = useIntl();
-  const toggleNotification = useNotification();
+  const { toggleNotification } = useNotification();
   const queryClient = useQueryClient();
-  const tokenRef = useRef(axios.CancelToken.source());
+  const abortController = new AbortController();
+  const signal = abortController.signal;
+  const { post } = useFetchClient();
 
   const mutation = useMutation(
-    ({ asset, file }) => editAssetRequest(asset, file, tokenRef.current, setProgress),
+    ({ asset, file }) => editAssetRequest(asset, file, signal, setProgress, post),
     {
       onSuccess() {
         queryClient.refetchQueries([pluginId, 'assets'], { active: true });
@@ -56,10 +57,10 @@ export const useEditAsset = () => {
         if (reason.response.status === 403) {
           toggleNotification({
             type: 'info',
-            message: { id: getTrad('permissions.not-allowed.update') },
+            message: formatMessage({ id: getTrad('permissions.not-allowed.update') }),
           });
         } else {
-          toggleNotification({ type: 'warning', message: reason.message });
+          toggleNotification({ type: 'danger', message: reason.message });
         }
       },
     }
@@ -67,10 +68,7 @@ export const useEditAsset = () => {
 
   const editAsset = (asset, file) => mutation.mutateAsync({ asset, file });
 
-  const cancel = () =>
-    tokenRef.current.cancel(
-      formatMessage({ id: getTrad('modal.upload.cancelled'), defaultMessage: '' })
-    );
+  const cancel = () => abortController.abort();
 
   return { ...mutation, cancel, editAsset, progress, status: mutation.status };
 };

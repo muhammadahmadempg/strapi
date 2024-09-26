@@ -22,6 +22,9 @@
     "rich_text": {
       "type": "richtext"
     },
+    "blocks": {
+      "type": "blocks"
+    },
     "integer": {
       "type": "integer"
     },
@@ -86,7 +89,7 @@
     },
     "dynamiczone": {
       "type": "dynamiczone",
-      "components": ["basic.simple"]
+      "components": ["basic.simple", "blog.test-como", "default.closingperiod"]
     },
     "one_way_tag": {
       "type": "relation",
@@ -131,6 +134,12 @@
       "type": "relation",
       "relation": "morphToMany"
     },
+    "morph_one": {
+      "type": "relation",
+      "relation": "morphOne",
+      "target": "api::tag.tag",
+      "morphBy": "taggable"
+    },
     "custom_field": {
       "type": "customField",
       "customField": "plugin::color-picker.color"
@@ -139,6 +148,14 @@
       "type": "customField",
       "regex": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$",
       "customField": "plugin::color-picker.color"
+    },
+    "cats": {
+      "type": "dynamiczone",
+      "components": ["basic.relation", "basic.simple"]
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "short_text"
     }
   }
 }

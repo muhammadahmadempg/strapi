@@ -3,9 +3,7 @@ name: Deploy contributor doc
 on:
   push:
     branches:
-      - 'main'
-    paths:
-      - 'docs/**'
+      - 'develop'
 
   workflow_dispatch:
 
@@ -29,14 +27,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 18
-          cache: yarn
+          node-version: 20
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install  --immutable
 
       - name: Build website
         run: yarn build
@@ -48,3 +45,4 @@ jobs:
           publish_dir: ./docs/build
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          cname: contributor.strapi.io

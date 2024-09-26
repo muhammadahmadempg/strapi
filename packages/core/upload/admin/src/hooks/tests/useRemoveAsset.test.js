@@ -1,10 +1,12 @@
 import React from 'react';
-import { IntlProvider } from 'react-intl';
-import { QueryClientProvider, QueryClient, useQueryClient } from 'react-query';
-import { renderHook, act } from '@testing-library/react-hooks';
 
-import { NotificationsProvider, useNotification } from '@strapi/helper-plugin';
-import { deleteRequest } from '../../utils/deleteRequest';
+import { NotificationsProvider, useNotification } from '@strapi/admin/strapi-admin';
+import { DesignSystemProvider } from '@strapi/design-system';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { server } from '@tests/utils';
+import { rest } from 'msw';
+import { IntlProvider } from 'react-intl';
+import { QueryClient, QueryClientProvider, useQueryClient } from 'react-query';
 
 import { useRemoveAsset } from '../useRemoveAsset';
 
@@ -12,16 +14,13 @@ const ASSET_FIXTURE = {
   id: 1,
 };
 
-jest.mock('../../utils/deleteRequest', () => ({
-  ...jest.requireActual('../../utils/deleteRequest'),
-  deleteRequest: jest.fn().mockResolvedValue({ id: 1 }),
-}));
-
 const notificationStatusMock = jest.fn();
 
-jest.mock('@strapi/helper-plugin', () => ({
-  ...jest.requireActual('@strapi/helper-plugin'),
-  useNotification: () => notificationStatusMock,
+jest.mock('@strapi/admin/strapi-admin', () => ({
+  ...jest.requireActual('@strapi/admin/strapi-admin'),
+  useNotification() {
+    return { toggleNotification: notificationStatusMock };
+  },
 }));
 
 const refetchQueriesMock = jest.fn();
@@ -45,11 +44,13 @@ const client = new QueryClient({
 function ComponentFixture({ children }) {
   return (
     <QueryClientProvider client={client}>
-      <NotificationsProvider toggleNotification={() => jest.fn()}>
-        <IntlProvider locale="en" messages={{}}>
-          {children}
-        </IntlProvider>
-      </NotificationsProvider>
+      <DesignSystemProvider>
+        <NotificationsProvider>
+          <IntlProvider locale="en" messages={{}}>
+            {children}
+          </IntlProvider>
+        </NotificationsProvider>
+      </DesignSystemProvider>
     </QueryClientProvider>
   );
 }
@@ -67,25 +68,10 @@ describe('useRemoveAsset', () => {
     jest.clearAllMocks();
   });
 
-  test('calls the proper endpoint', async () => {
-    const {
-      result: { current },
-      waitFor,
-    } = await setup(jest.fn);
-    const { removeAsset } = current;
-
-    await act(async () => {
-      await removeAsset(ASSET_FIXTURE);
-    });
-
-    await waitFor(() => expect(deleteRequest).toBeCalledWith('files', ASSET_FIXTURE));
-  });
-
   test('calls toggleNotification in case of an success', async () => {
-    const toggleNotification = useNotification();
+    const { toggleNotification } = useNotification();
     const {
       result: { current },
-      waitFor,
     } = await setup(jest.fn);
     const { removeAsset } = current;
 
@@ -106,7 +92,6 @@ describe('useRemoveAsset', () => {
     const queryClient = useQueryClient();
     const {
       result: { current },
-      waitFor,
     } = await setup(jest.fn);
     const { removeAsset } = current;
 
@@ -122,15 +107,17 @@ describe('useRemoveAsset', () => {
   });
 
   test('calls toggleNotification in case of an error', async () => {
+    server.use(
+      rest.delete('/upload/:type/:id', (req, res, ctx) => {
+        return res(ctx.status(500));
+      })
+    );
     const originalConsoleError = console.error;
     console.error = jest.fn();
 
-    deleteRequest.mockRejectedValue({ message: 'error-msg' });
-
-    const toggleNotification = useNotification();
+    const { toggleNotification } = useNotification();
     const {
       result: { current },
-      waitFor,
     } = await setup();
     const { removeAsset } = current;
 
@@ -144,7 +131,7 @@ describe('useRemoveAsset', () => {
 
     await waitFor(() =>
       expect(toggleNotification).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'warning', message: 'error-msg' })
+        expect.objectContaining({ type: 'danger', message: 'Unexpected end of JSON input' })
       )
     );
 

@@ -1,13 +1,15 @@
+import { useNotification, useFetchClient } from '@strapi/admin/strapi-admin';
+import { useIntl } from 'react-intl';
 import { useMutation, useQueryClient } from 'react-query';
-import { useNotification } from '@strapi/helper-plugin';
 
 import pluginId from '../pluginId';
-import { axiosInstance, getRequestUrl, getTrad } from '../utils';
+import { getTrad } from '../utils';
 
 export const useBulkMove = () => {
-  const toggleNotification = useNotification();
+  const { formatMessage } = useIntl();
+  const { toggleNotification } = useNotification();
   const queryClient = useQueryClient();
-  const url = getRequestUrl('actions/bulk-move');
+  const { post } = useFetchClient();
 
   const bulkMoveQuery = ({ destinationFolderId, filesAndFolders }) => {
     const payload = filesAndFolders.reduce((acc, selected) => {
@@ -23,7 +25,7 @@ export const useBulkMove = () => {
       return acc;
     }, {});
 
-    return axiosInstance.post(url, { ...payload, destinationFolderId });
+    return post('/upload/actions/bulk-move', { ...payload, destinationFolderId });
   };
 
   const mutation = useMutation(bulkMoveQuery, {
@@ -43,10 +45,10 @@ export const useBulkMove = () => {
 
       toggleNotification({
         type: 'success',
-        message: {
+        message: formatMessage({
           id: getTrad('modal.move.success-label'),
           defaultMessage: 'Elements have been moved successfully.',
-        },
+        }),
       });
     },
   });

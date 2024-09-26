@@ -1,39 +1,50 @@
+import { useNotification, useFetchClient } from '@strapi/admin/strapi-admin';
+import { useIntl } from 'react-intl';
 import { useQuery } from 'react-query';
-import { useNotification } from '@strapi/helper-plugin';
 
 import pluginId from '../pluginId';
-import { axiosInstance, getRequestUrl, getTrad } from '../utils';
+import { getTrad } from '../utils';
 
-export const useFolder = (id, { enabled = true }) => {
-  const toggleNotification = useNotification();
-  const dataRequestURL = getRequestUrl('folders');
+export const useFolder = (id, { enabled = true } = {}) => {
+  const { toggleNotification } = useNotification();
+  const { get } = useFetchClient();
+  const { formatMessage } = useIntl();
 
-  const fetchFolder = async () => {
-    try {
-      const { data } = await axiosInstance.get(
-        `${dataRequestURL}/${id}?populate[parent][populate][parent]=*`
-      );
-
-      return data.data;
-    } catch (err) {
-      toggleNotification({
-        type: 'warning',
-        message: {
-          id: getTrad('notification.warning.404'),
-          defaultMessage: 'Not found',
+  const { data, error, isLoading } = useQuery(
+    [pluginId, 'folder', id],
+    async () => {
+      const {
+        data: { data },
+      } = await get(`/upload/folders/${id}`, {
+        params: {
+          populate: {
+            parent: {
+              populate: {
+                parent: '*',
+              },
+            },
+          },
         },
       });
 
-      throw err;
+      return data;
+    },
+    {
+      retry: false,
+      enabled,
+      staleTime: 0,
+      cacheTime: 0,
+      onError() {
+        toggleNotification({
+          type: 'danger',
+          message: formatMessage({
+            id: getTrad('notification.warning.404'),
+            defaultMessage: 'Not found',
+          }),
+        });
+      },
     }
-  };
-
-  const { data, error, isLoading } = useQuery([pluginId, 'folder', id], fetchFolder, {
-    retry: false,
-    enabled,
-    staleTime: 0,
-    cacheTime: 0,
-  });
+  );
 
   return { data, error, isLoading };
 };

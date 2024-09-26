@@ -1,18 +1,18 @@
-import { stringify } from 'qs';
-import { useQuery } from 'react-query';
-import { useNotifyAT } from '@strapi/design-system/LiveRegions';
-import { useNotification } from '@strapi/helper-plugin';
+import { useEffect } from 'react';
+
+import { useNotification, useFetchClient } from '@strapi/admin/strapi-admin';
+import { useNotifyAT } from '@strapi/design-system';
 import { useIntl } from 'react-intl';
+import { useQuery } from 'react-query';
 
 import pluginId from '../pluginId';
-import { axiosInstance, getRequestUrl } from '../utils';
 
 export const useAssets = ({ skipWhen = false, query = {} } = {}) => {
   const { formatMessage } = useIntl();
-  const toggleNotification = useNotification();
+  const { toggleNotification } = useNotification();
   const { notifyStatus } = useNotifyAT();
-  const dataRequestURL = getRequestUrl('files');
-  const { folder, _q, ...paramsExceptFolderAndQ } = query;
+  const { get } = useFetchClient();
+  const { folderPath, _q, ...paramsExceptFolderAndQ } = query;
 
   let params;
 
@@ -28,49 +28,71 @@ export const useAssets = ({ skipWhen = false, query = {} } = {}) => {
         $and: [
           ...(paramsExceptFolderAndQ?.filters?.$and ?? []),
           {
-            folder: {
-              id: folder ?? {
-                $null: true,
-              },
-            },
+            folderPath: { $eq: folderPath ?? '/' },
           },
         ],
       },
     };
   }
 
-  const getAssets = async () => {
-    try {
-      const { data } = await axiosInstance.get(
-        `${dataRequestURL}${stringify(params, {
-          encode: false,
-          addQueryPrefix: true,
-        })}`
-      );
+  const { data, error, isLoading } = useQuery(
+    [pluginId, 'assets', params],
+    async () => {
+      const { data } = await get('/upload/files', { params });
 
+      return data;
+    },
+    {
+      enabled: !skipWhen,
+      staleTime: 0,
+      cacheTime: 0,
+      select(data) {
+        if (data?.results && Array.isArray(data.results)) {
+          return {
+            ...data,
+            results: data.results
+              /**
+               * Filter out assets that don't have a name.
+               * So we don't try to render them as assets
+               * and get errors.
+               */
+              .filter((asset) => asset.name)
+              .map((asset) => ({
+                ...asset,
+                /**
+                 * Mime and ext cannot be null in the front-end because
+                 * we expect them to be strings and use the `includes` method.
+                 */
+                mime: asset.mime ?? '',
+                ext: asset.ext ?? '',
+              })),
+          };
+        }
+
+        return data;
+      },
+    }
+  );
+
+  useEffect(() => {
+    if (data) {
       notifyStatus(
         formatMessage({
           id: 'list.asset.at.finished',
           defaultMessage: 'The assets have finished loading.',
         })
       );
-
-      return data;
-    } catch (err) {
-      toggleNotification({
-        type: 'warning',
-        message: { id: 'notification.error' },
-      });
-
-      throw err;
     }
-  };
+  }, [data, formatMessage, notifyStatus]);
 
-  const { data, error, isLoading } = useQuery([pluginId, 'assets', stringify(params)], getAssets, {
-    enabled: !skipWhen,
-    staleTime: 0,
-    cacheTime: 0,
-  });
+  useEffect(() => {
+    if (error) {
+      toggleNotification({
+        type: 'danger',
+        message: formatMessage({ id: 'notification.error' }),
+      });
+    }
+  }, [error, formatMessage, toggleNotification]);
 
   return { data, error, isLoading };
 };
